@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>EcoBanner: comparador de huella de carbono</title>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+--bg:#f3f5f1;--fg:#16211b;--mut:#5d6b62;--card:#fff;--line:#d5dcd3;--acc:#1f6f4a;--bad:#a63d2f}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#101613;--fg:#e6ede8;--mut:#93a39a;--card:#18211c;--line:#2b3830;--acc:#5fd39a;--bad:#e08a7c}}
+:root[data-theme="dark"]{--bg:#101613;--fg:#e6ede8;--mut:#93a39a;--card:#18211c;--line:#2b3830;--acc:#5fd39a;--bad:#e08a7c}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*:before,*:after{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 "Segoe UI",system-ui,-apple-system,sans-serif}
+main{max-width:960px;margin:0 auto;padding:28px 18px 48px}
+h1{font-size:1.7rem;line-height:1.15;margin:0 0 6px;letter-spacing:-.01em}
+h3{font-size:.95rem;margin:0 0 6px}
+p.sub{margin:0 0 20px;color:var(--mut);max-width:65ch}
+.pair{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin:0 0 16px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:620px){.two{grid-template-columns:1fr}}
+label.drop{display:block;border:2px dashed var(--line);border-radius:10px;padding:22px 12px;text-align:center;cursor:pointer;word-break:break-all;min-height:84px}
+label.drop.over,label.drop:focus-within{border-color:var(--acc)}
+label.drop.has{border-style:solid}
+label.drop small{display:block;color:var(--mut)}
+input[type=file]{position:absolute;opacity:0;width:1px;height:1px}
+select,input[type=number],input.t{font:inherit;color:var(--fg);background:var(--card);border:1px solid var(--line);border-radius:8px;padding:5px 8px}
+select:focus-visible,input:focus-visible,button:focus-visible,label.drop:focus-within{outline:2px solid var(--acc);outline-offset:1px}
+.ctl{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;font-size:.85rem;color:var(--mut)}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;font-size:.92rem;margin-top:14px}
+th,td{padding:7px 8px;text-align:right;border-bottom:1px solid var(--line)}
+th:first-child,td:first-child{text-align:left}
+th{color:var(--mut);font-weight:600;font-size:.8rem}
+.big{display:flex;gap:22px;flex-wrap:wrap;margin-top:14px}
+.big strong{display:block;font-size:1.6rem;color:var(--acc);font-variant-numeric:tabular-nums}
+.big small{color:var(--mut)}
+.bad{color:var(--bad)!important}
+.tot{border:2px solid var(--acc)}
+details{margin:6px 0 18px}
+summary{cursor:pointer;color:var(--mut)}
+.params{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin:12px 0}
+label.f{font-size:.85rem;color:var(--mut)}
+label.f input{display:block;width:100%;margin-top:4px}
+input.t{width:100%;margin-top:12px}
+button{font:inherit;padding:8px 14px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--fg);cursor:pointer}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.foot{margin-top:22px;font-size:.85rem;color:var(--mut);max-width:75ch}
+</style>
+</head>
+<body>
+<main>
+<h1>Comparador de huella de carbono</h1>
+<p class="sub">Sube el banner actual y el rediseñado (cualquier formato) y ve la diferencia. Puedes agregar más pares para tu auditoría. Todo se calcula en tu navegador.</p>
+
+<details>
+<summary>Parámetros del modelo (visualizaciones, energía, intensidad, conexión)</summary>
+<div class="params">
+<label class="f">Visualizaciones<input id="views" type="number" min="1" value="10000"></label>
+<label class="f">Energía total (kWh por GB)<input id="kwh" type="number" step="0.001" min="0" value="0.300"></label>
+<label class="f">Intensidad eléctrica (g CO₂/kWh)<input id="ci" type="number" min="0" value="494"></label>
+<label class="f">Intensidad alternativa, opcional<input id="alt" type="number" min="0" placeholder="g CO₂/kWh"></label>
+<label class="f">Conexión (Mbps)<input id="mbps" type="number" step="0.1" min="0.1" value="5"></label>
+</div>
+<label><input type="checkbox" id="cache"> Aplicar supuesto de caché (75 % visitas nuevas, 25 % recurrentes que recargan 2 %)</label>
+</details>
+
+<div id="tot"></div>
+<div id="pairs"></div>
+<div class="row"><button id="add">Agregar otro par</button><button id="copy">Copiar resultados</button></div>
+
+<p class="foot">Método: peso × kWh/GB × g CO₂/kWh, con los valores del Sustainable Web Design Model v4 (0,194 kWh/GB operativos + 0,106 de energía incorporada en equipos, y 494 g/kWh de promedio mundial), el que usan CO2.js y Website Carbon. El tiempo de carga es solo transferencia con la conexión indicada, sin latencia; para tiempos reales usa PageSpeed Insights o GTmetrix. Son estimaciones para comparar piezas entre sí, no mediciones. Como ambos lados usan los mismos parámetros, el % de reducción no depende de la intensidad eléctrica; esta solo cambia los gramos absolutos.</p>
+</main>
+<script>
+(function(){
+var $=function(i){return document.getElementById(i)},pairs=[{a:null,b:null,note:''}];
+function fg(g){return g>=100?g.toFixed(0):g>=1?g.toFixed(2):g>=0.01?g.toFixed(3):g.toFixed(4)}
+function P(){return{v:Math.max(1,+$('views').value||1),k:+$('kwh').value||0,c:+$('ci').value||0,a:+$('alt').value||0,m:Math.max(.1,+$('mbps').value||5),f:$('cache').checked?0.755:1}}
+function g1(b,p){return b/1e9*p.k*p.c*p.f}
+function el(t,x,c){var e=document.createElement(t);if(x!=null)e.textContent=x;if(c)e.className=c;return e}
+function ext(f){var m=/\.([^.]+)$/.exec(f.name);return m?m[1].toUpperCase():(f.type||'?').replace('image/','').toUpperCase()}
+function sel(vals,cur,cb){var s=document.createElement('select');vals.forEach(function(v){var o=el('option',v);o.value=v;if(v===cur)o.selected=true;s.appendChild(o)});s.addEventListener('change',function(){cb(s.value)});return s}
+function slot(pr,key,title){
+var d=el('div'),l=el('label',null,'drop'),f=pr[key],inp=el('input');
+d.appendChild(el('h3',title));inp.type='file';l.tabIndex=-1;l.appendChild(inp);
+function set(file){if(!file)return;pr[key]={name:file.name,ext:ext(file),bytes:file.size,an:'No',au:'No'};render()}
+if(f){l.className='drop has';l.appendChild(el('div',f.name));l.appendChild(el('small',f.ext+' · '+(f.bytes/1024).toFixed(1)+' KB · clic para cambiar'))}
+else{l.appendChild(el('div','Arrastra el archivo aquí o haz clic'));l.appendChild(el('small','cualquier formato'))}
+inp.addEventListener('change',function(){set(inp.files[0])});
+l.addEventListener('dragover',function(e){e.preventDefault();l.classList.add('over')});
+l.addEventListener('dragleave',function(){l.classList.remove('over')});
+l.addEventListener('drop',function(e){e.preventDefault();l.classList.remove('over');if(e.dataTransfer&&e.dataTransfer.files[0])set(e.dataTransfer.files[0])});
+d.appendChild(l);
+if(f){var c=el('div',null,'ctl');c.appendChild(el('span','Animación'));c.appendChild(sel(['No','Sí'],f.an,function(v){f.an=v}));c.appendChild(el('span','Autoplay'));c.appendChild(sel(['No','Sí'],f.au,function(v){f.au=v}));d.appendChild(c)}
+return d}
+function pct(a,b){return a>0?(1-b/a)*100:0}
+function chg(a,b){if(!(a>0))return '—';var x=(b/a-1)*100;return (x>0?'+':'')+x.toFixed(1)+' %'}
+function render(){
+var p=P(),root=$('pairs'),tot=$('tot');root.innerHTML='';tot.innerHTML='';
+var sa=0,sb=0,n=0;
+pairs.forEach(function(pr,i){
+var card=el('section',null,'pair'),two=el('div',null,'two');
+two.appendChild(slot(pr,'a','Actual'));two.appendChild(slot(pr,'b','Rediseño'));card.appendChild(two);
+if(pr.a&&pr.b){n++;sa+=pr.a.bytes;sb+=pr.b.bytes;
+var A=pr.a.bytes,B=pr.b.bytes,r=pct(A,B),ga=g1(A,p)*p.v,gb=g1(B,p)*p.v;
+var big=el('div',null,'big'),x=el('div'),s=el('strong',(r>=0?'−':'+')+Math.abs(r).toFixed(1)+' % CO₂');if(r<0)s.className='bad';
+x.appendChild(s);x.appendChild(el('small','con '+p.v.toLocaleString('es-CO')+' visualizaciones'));big.appendChild(x);
+x=el('div');x.appendChild(el('strong',fg(Math.abs(ga-gb))+' g'));x.appendChild(el('small',ga>=gb?'CO₂ ahorrado':'CO₂ adicional'+(p.a&&p.c?'':'')));big.appendChild(x);
+if(p.a&&p.c){x=el('div');x.appendChild(el('strong',fg(Math.abs(ga-gb)*p.a/p.c)+' g'));x.appendChild(el('small','con '+p.a+' g/kWh'));big.appendChild(x)}
+card.appendChild(big);
+var t=el('table'),h=el('thead'),hr=el('tr');['','Actual','Rediseño','Cambio'].forEach(function(z){hr.appendChild(el('th',z))});h.appendChild(hr);t.appendChild(h);
+var tb=el('tbody');
+[['Formato',pr.a.ext,pr.b.ext,''],['Animación / autoplay',pr.a.an+' / '+pr.a.au,pr.b.an+' / '+pr.b.au,''],
+['Peso (KB)',(A/1024).toFixed(1),(B/1024).toFixed(1),chg(A,B)],
+['Carga estimada (s)',(A*8/(p.m*1e6)).toFixed(2),(B*8/(p.m*1e6)).toFixed(2),chg(A,B)],
+['g CO₂ por vista',fg(g1(A,p)),fg(g1(B,p)),chg(A,B)],
+['g CO₂ total',fg(ga),fg(gb),chg(ga,gb)]].forEach(function(r2){var tr=el('tr');r2.forEach(function(z){tr.appendChild(el('td',z))});tb.appendChild(tr)});
+t.appendChild(tb);card.appendChild(t);
+var nt=el('input',null,'t');nt.placeholder='Notas de optimización (compresión, WebP, SVG, quitar autoplay…)';nt.value=pr.note;nt.addEventListener('change',function(){pr.note=nt.value});card.appendChild(nt)}
+if(pairs.length>1){var rm=el('button','Quitar este par');rm.style.marginTop='12px';rm.addEventListener('click',function(){pairs.splice(i,1);render()});card.appendChild(rm)}
+root.appendChild(card)});
+if(n>1){var c=el('section',null,'pair tot'),big=el('div',null,'big'),ta=g1(sa,p)*p.v,tbb=g1(sb,p)*p.v,r=pct(sa,sb),x=el('div');
+c.appendChild(el('h3','Total de '+n+' pares'));
+var s=el('strong',(r>=0?'−':'+')+Math.abs(r).toFixed(1)+' % CO₂');if(r<0)s.className='bad';x.appendChild(s);x.appendChild(el('small','Actual '+fg(ta)+' g → Rediseño '+fg(tbb)+' g'));big.appendChild(x);
+x=el('div');x.appendChild(el('strong',(sa/1048576).toFixed(2)+' → '+(sb/1048576).toFixed(2)+' MB'));x.appendChild(el('small','peso total'));big.appendChild(x);c.appendChild(big);tot.appendChild(c)}
+}
+$('add').addEventListener('click',function(){pairs.push({a:null,b:null,note:''});render()});
+['views','kwh','ci','alt','mbps','cache'].forEach(function(i){$(i).addEventListener('input',render)});
+$('copy').addEventListener('click',function(){var p=P();
+var t='Par\tFormato actual\tFormato rediseño\tKB actual\tKB rediseño\tg CO2 actual ('+p.v+' vistas)\tg CO2 rediseño\tReducción %\tNotas\n';
+pairs.forEach(function(pr,i){if(pr.a&&pr.b){var ga=g1(pr.a.bytes,p)*p.v,gb=g1(pr.b.bytes,p)*p.v;
+t+=[i+1,pr.a.ext,pr.b.ext,(pr.a.bytes/1024).toFixed(1),(pr.b.bytes/1024).toFixed(1),ga.toFixed(3),gb.toFixed(3),pct(pr.a.bytes,pr.b.bytes).toFixed(1),pr.note].join('\t')+'\n'}});
+var b=$('copy');try{navigator.clipboard.writeText(t).then(function(){b.textContent='Copiado';setTimeout(function(){b.textContent='Copiar resultados'},1500)},function(){b.textContent='No se pudo copiar'})}catch(e){b.textContent='No se pudo copiar'}});
+render();
+})();
+</script>
+</body>
+</html>
